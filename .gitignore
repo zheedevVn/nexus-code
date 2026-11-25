@@ -1,0 +1,4 @@
+target/
+.env
+*.vsix
+.DS_Store
