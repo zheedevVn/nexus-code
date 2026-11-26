@@ -1,0 +1,1 @@
+{"description":"NexusCode proxy: OpenAI-compatible POST /v1/chat/completions -> Gemini, login-only (Bearer token cua user, khong API key server).","name":"nexuscode-proxy","private":true,"version":"0.3.0"}
