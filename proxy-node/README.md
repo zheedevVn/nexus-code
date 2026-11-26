@@ -52,9 +52,11 @@ Endpoint cho app/VSIX:
 https://nexuscode.mmovn.space/v1/chat/completions
 ```
 
-Thay URL này vào `vsix/package.json` (hiện còn placeholder
-`https://api.nexuscode.example/v1/chat/completions`), tăng version vsix,
-đóng gói lại `.vsix`, đồng bộ GitHub + GitLab.
+Thay URL này vào `vsix/package.json` — ĐÃ XONG 26/11/2026
+(endpoint thật `https://nexuscode.mmovn.space/v1/chat/completions`,
+version vsix 0.2.0). Còn lại: điền OAuth client ID + project number
+thật sau khi Chủ tịch tạo OAuth client, rồi đóng gói lại `.vsix`,
+đồng bộ GitHub + GitLab.
 
 ## Lưu ý
 

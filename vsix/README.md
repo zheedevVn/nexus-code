@@ -35,18 +35,18 @@ Hiện cả hai còn là placeholder (`YOUR_GOOGLE_OAUTH_CLIENT_ID...` /
 `YOUR_GOOGLE_CLOUD_PROJECT_NUMBER`). Khi Chủ tịch tạo xong OAuth client
 xem README repo (mục "Đăng nhập Google — việc chỉ Chủ tịch làm được"),
 điền giá trị thật vào đây, tăng version vsix rồi đóng gói lại.
-Endpoint proxy (`https://api.nexuscode.example/v1/chat/completions`) cũng
-còn là placeholder — thay bằng URL proxy thật sau khi deploy, cùng một lần.
+Endpoint proxy thật: `https://nexuscode.mmovn.space/v1/chat/completions`
+(proxy đã deploy trên hosting 26/11/2026, app Node 20.18.3 đang chạy).
 
 ## Đóng gói
 
 ```bash
 npx @vscode/vsce package
-# -> nexuscode-agent-0.1.0.vsix
-```
+# -> nexuscode-agent-0.2.0.vsix
 
-Chưa đóng gói lại vội: endpoint và OAuth client ID vẫn là placeholder.
-Đóng gói sau khi có URL proxy thật + OAuth client ID thật.
+Chưa đóng gói lại vội: OAuth client ID và project number vẫn là
+placeholder — đóng gói sau khi Chủ tịch tạo xong OAuth client trên
+Google Cloud Console và điền giá trị thật.
 
 ## Lưu ý
 

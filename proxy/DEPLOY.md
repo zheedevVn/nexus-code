@@ -50,8 +50,9 @@ Setup Node.js App, khong can the, khong can tai khoan moi.
 
 ## Sau khi co URL that
 
-1. Thay endpoint placeholder trong `vsix/package.json`
-   (`https://api.nexuscode.example/v1/chat/completions` → URL that).
+1. ~~Thay endpoint placeholder trong `vsix/package.json`~~ — ĐÃ XONG
+   26/11/2026: endpoint thật `https://nexuscode.mmovn.space/v1/chat/completions`,
+   version vsix 0.2.0 (proxy đã deploy, app Node 20.18.3 đang chạy).
 2. Tang version vsix 0.1.0 → 0.2.0, dong goi lai `.vsix`.
 3. Dong bo GitHub + GitLab, build VisualEditIDE qua GitHub Actions
    (workflow `build-ipa.yml` tu chay khi push len main) de kiem
