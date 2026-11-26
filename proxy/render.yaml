@@ -1,0 +1,18 @@
+# NexusCode proxy — Render (phuong an khong can the)
+# Dat file nay o repo root neu dung Render Blueprint, hoac tao Web Service
+# thu cong chon Docker + repo nay. Render tu dat bien PORT, proxy doc PORT.
+# Luu y: goi Free ngu sau 15 phut khong co traffic, lan chat dau tien sau
+# do cho ~30-60s de may tinh lai. Khong ngu neu dung goi tra phi.
+services:
+  - type: web
+    name: nexuscode-proxy
+    runtime: docker
+    dockerfilePath: ./proxy/Dockerfile
+    dockerContext: ./proxy
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: GCP_PROJECT_NUMBER
+        sync: false
+      - key: RATE_LIMIT_PER_MIN
+        value: "30"

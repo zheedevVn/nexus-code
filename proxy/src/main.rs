@@ -1,8 +1,9 @@
-// NexusCode proxy 0.2.0 — OpenAI-compatible POST /v1/chat/completions -> Gemini.
-// Key Gemini chi song trong env server, khong bao gio ve client.
-// Phase 1: KHONG yeu cau Bearer (app gui khong co Authorization header);
-// chong lam dung bang rate-limit theo IP (30 req/phut). Phase 2: xac thuc
-// token "Dang nhap bang Zhee" (OAuth) roi moi goi Gemini.
+// NexusCode proxy 0.3.0 — OpenAI-compatible POST /v1/chat/completions -> Gemini.
+// LOGIN-ONLY: khong con API key. App dang nhap Google, gui
+// `Authorization: Bearer <access_token>`; proxy chuyen tiep token do + header
+// `x-goog-user-project` sang Gemini. Quota tinh theo tai khoan Google cua
+// tung nguoi dung (free tier), khong phai theo key server.
+// Chong lam dung bang rate-limit theo IP (30 req/phut).
 
 use axum::{
     extract::{ConnectInfo, Json, State},
@@ -31,7 +32,12 @@ const GEMINI_BASE: &str = "https://generativelanguage.googleapis.com/v1beta";
 
 #[derive(Clone)]
 struct AppState {
-    gemini_key: String,
+    /// So project Google Cloud (public, khong phai secret). Gui kem moi
+    /// request qua header `x-goog-user-project`; uu tien hon header cung
+    /// ten do client gui len.
+    project_number: String,
+    /// Cho phep tro sang Gemini gia lap khi test (env GEMINI_BASE).
+    gemini_base: String,
     http: reqwest::Client,
     hits: Arc<Mutex<HashMap<std::net::IpAddr, (Instant, u32)>>>,
 }
@@ -217,15 +223,37 @@ fn rate_limited(state: &AppState, ip: std::net::IpAddr) -> bool {
 async fn chat_completions(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: axum::http::HeaderMap,
     Json(req): Json<ChatRequest>,
 ) -> impl IntoResponse {
-    if state.gemini_key.is_empty() {
+    // LOGIN-ONLY: can Bearer token tu client; khong co -> 401.
+    let bearer = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .strip_prefix("Bearer ")
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(str::to_string);
+    let Some(token) = bearer else {
         return (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(serde_json::json!({"error": "server key not configured"})),
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error": "login required"})),
         )
             .into_response();
-    }
+    };
+    // x-goog-user-project: env server uu tien, neu khong co thi lay header
+    // do client gui (app lay tu vsix contribution).
+    let user_project = if !state.project_number.is_empty() {
+        Some(state.project_number.clone())
+    } else {
+        headers
+            .get("x-goog-user-project")
+            .and_then(|v| v.to_str().ok())
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+    };
     if rate_limited(&state, addr.ip()) {
         return (
             StatusCode::TOO_MANY_REQUESTS,
@@ -256,18 +284,20 @@ async fn chat_completions(
     };
 
     if req.stream {
-        return stream_reply(state, model, body).await.into_response();
+        return stream_reply(state, model, body, token, user_project)
+            .await
+            .into_response();
     }
 
-    let url = format!("{GEMINI_BASE}/models/{model}:generateContent");
-    let resp = match state
+    let url = format!("{}/models/{model}:generateContent", state.gemini_base);
+    let mut rb = state
         .http
         .post(&url)
-        .header("x-goog-api-key", &state.gemini_key)
-        .json(&body)
-        .send()
-        .await
-    {
+        .header(axum::http::header::AUTHORIZATION, format!("Bearer {token}"));
+    if let Some(project) = &user_project {
+        rb = rb.header("x-goog-user-project", project.clone());
+    }
+    let resp = match rb.json(&body).send().await {
         Ok(r) => r,
         Err(e) => {
             return (
@@ -322,16 +352,21 @@ async fn stream_reply(
     state: AppState,
     model: String,
     body: GeminiRequest,
+    token: String,
+    user_project: Option<String>,
 ) -> impl IntoResponse {
-    let url = format!("{GEMINI_BASE}/models/{model}:streamGenerateContent?alt=sse");
-    let resp = match state
+    let url = format!(
+        "{}/models/{model}:streamGenerateContent?alt=sse",
+        state.gemini_base
+    );
+    let mut rb = state
         .http
         .post(&url)
-        .header("x-goog-api-key", &state.gemini_key)
-        .json(&body)
-        .send()
-        .await
-    {
+        .header(axum::http::header::AUTHORIZATION, format!("Bearer {token}"));
+    if let Some(project) = &user_project {
+        rb = rb.header("x-goog-user-project", project.clone());
+    }
+    let resp = match rb.json(&body).send().await {
         Ok(r) => r,
         Err(e) => {
             return (
@@ -432,12 +467,13 @@ async fn main() {
         .init();
 
     let state = AppState {
-        gemini_key: std::env::var("GEMINI_API_KEY").unwrap_or_default(),
+        project_number: std::env::var("GCP_PROJECT_NUMBER").unwrap_or_default(),
+        gemini_base: std::env::var("GEMINI_BASE").unwrap_or_else(|_| GEMINI_BASE.to_string()),
         http: reqwest::Client::new(),
         hits: Arc::new(Mutex::new(HashMap::new())),
     };
-    if state.gemini_key.is_empty() {
-        tracing::warn!("GEMINI_API_KEY chua dat — /v1/chat/completions se tra 503");
+    if state.project_number.is_empty() {
+        tracing::warn!("GCP_PROJECT_NUMBER chua dat — request se thieu x-goog-user-project (app phai gui header nay)");
     }
 
     let app = Router::new()
@@ -458,4 +494,40 @@ async fn main() {
     )
     .await
     .unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn msg(role: &str, content: &str) -> ChatMessage {
+        ChatMessage {
+            role: role.to_string(),
+            content: content.to_string(),
+        }
+    }
+
+    #[test]
+    fn normalize_merges_same_role_and_drops_leading_model() {
+        let (contents, system) = normalize_contents(&[
+            msg("system", "You are helpful"),
+            msg("assistant", "leading model to drop"),
+            msg("user", "hi"),
+            msg("user", "again"),
+            msg("assistant", "reply"),
+        ]);
+        assert_eq!(system.as_deref(), Some("You are helpful"));
+        assert_eq!(contents.len(), 2);
+        assert_eq!(contents[0].role.as_deref(), Some("user"));
+        assert_eq!(contents[0].parts[0].text, "hi\n\nagain");
+        assert_eq!(contents[1].role.as_deref(), Some("model"));
+        assert_eq!(contents[1].parts[0].text, "reply");
+    }
+
+    #[test]
+    fn normalize_empty_messages() {
+        let (contents, system) = normalize_contents(&[]);
+        assert!(contents.is_empty());
+        assert!(system.is_none());
+    }
 }

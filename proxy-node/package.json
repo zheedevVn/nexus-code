@@ -1,0 +1,1 @@
+{"description":"NexusCode proxy — OpenAI-compatible POST /v1/chat/completions -> Gemini (ban Node, chay tren hosting cPanel)","engines":{"node":">=14"},"license":"MIT","main":"server.js","name":"nexuscode-proxy","scripts":{"start":"node server.js"},"version":"0.3.0"}

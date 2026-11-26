@@ -1,0 +1,38 @@
+# NexusCode proxy — Fly.io
+# App name phai duy nhat toan cuc; neu `fly launch` bao trung thi doi ten khac.
+# Vung sin (Singapore) gan VN nhat. May shared-cpu-1x 256MB chay lien tuc
+# het ~$2.19/thang, nam trong muc $5/thang cua goi Free (ca nhan, can the).
+# Chu y: vuot $5 thi tu chuyen sang Pay As You Go va tinh ca thang tu $0.
+app = "nexuscode-proxy"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  [[services.http_checks]]
+    path = "/health"
+    interval = "30s"
+    grace_period = "10s"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
